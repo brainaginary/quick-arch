@@ -154,12 +154,7 @@ if [[ -n "$username" ]]; then
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
 fi
 
-arch-chroot /mnt sudo pacman -Syu --noconfirm hyprland wayland xorg-xwayland wlroots sddm kitty
-
-arch-chroot /mnt sudo systemctl enable sddm.service
-arch-chroot /mnt sudo systemctl start sddm.service
-
-# Unmount and reboot
+#Unmount and reboot
 umount -R /mnt
 reboot
 
