@@ -169,9 +169,6 @@ echo -ne "${BOLD}${BYELLOW}
 ${RESET}"
 info_print "Welcome to easy-arch, a script made in order to simplify the process of installing Arch Linux."
 
-# Setting up keyboard layout.
-until keyboard_selector; do : ; done
-
 # Choosing the target for the installation.
 info_print "Available disks for the installation:"
 PS3="Please select the number of the corresponding disk (e.g. 1): "
