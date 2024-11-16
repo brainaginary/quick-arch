@@ -1,31 +1,10 @@
 #!/bin/bash
 
-get_and_confirm_input() {
-    local prompt="$1"
-    local input1 input2
-    while true; do
-        # First input
-        read -p "$prompt" input1
-        # Second input (confirmation)
-        read -p "Confirm $prompt: " input2
-
-        # Check if the two inputs match
-        if [[ "$input1" == "$input2" ]]; then
-            break
-        else
-            echo "Inputs do not match"
-        fi
-    done
-}
-
 # List available disks
 lsblk
 
 # Ask for target disk
 read -p "Enter the target disk (e.g., /dev/sda): " TARGET_DISK
-rootpasswd=$(get_and_confirm_input "Please enter password for ROOT: ")
-username=$(get_and_confirm_input "Please enter your username: ")
-userpasswd=$(get_and_confirm_input "Please enter password: ")
 
 # Create GPT partition table
 parted $TARGET_DISK mklabel gpt
@@ -86,11 +65,13 @@ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB 
 grub-mkconfig -o /boot/grub/grub.cfg
 
 # Create user
-useradd -m -G wheel $username
-echo -e "$userpasswd\n$userpasswd" | passwd "$username"
+read -p "Enter username for new user: " USERNAME
+useradd -m -G wheel $USERNAME
+passwd $USERNAME
 
 # Set root password
-echo -e "$rootpasswd\n$rootpasswd" | passwd
+echo "Set the root password"
+passwd
 
 # Enable sudo for the user (require "wheel" group)
 echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
