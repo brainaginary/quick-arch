@@ -85,6 +85,11 @@ lsblk
 # Ask for target disk
 read -p "Enter the target disk (e.g., /dev/sda): " TARGET_DISK
 
+# User sets up the user/root passwords.
+until userpass_selector; do : ; done
+until rootpass_selector; do : ; done
+until hostname_selector; do : ; done
+
 # Create GPT partition table
 parted $TARGET_DISK mklabel gpt
 
@@ -113,23 +118,14 @@ mount ${TARGET_DISK}3 /mnt
 mkdir -p /mnt/boot/efi
 mount ${TARGET_DISK}1 /mnt/boot/efi
 
-# User sets up the user/root passwords.
-until userpass_selector; do : ; done
-until rootpass_selector; do : ; done
-until hostname_selector; do : ; done
-
 # Install base system, GRUB, and required packages
-pacstrap /mnt base base-devel linux linux-firmware grub efibootmgr
+pacstrap /mnt base base-devel linux-zen linux-firmware grub efibootmgr sudo
 
 # Generate fstab file
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot into the new system
 arch-chroot /mnt <<EOF
-
-	# Set the timezone
-	ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
-	hwclock --systohc
 
 	# Set locale
 	sed -i '/en_US.UTF-8/s/^#//g' /etc/locale.gen
@@ -157,6 +153,11 @@ if [[ -n "$username" ]]; then
     info_print "Setting user password for $username."
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
 fi
+
+arch-chroot /mnt sudo pacman -Syu --noconfirm hyprland wayland xorg-xwayland wlroots sddm kitty
+
+arch-chroot /mnt sudo systemctl enable sddm.service
+arch-chroot /mnt sudo systemctl start sddm.service
 
 # Unmount and reboot
 umount -R /mnt
