@@ -113,6 +113,11 @@ mount ${TARGET_DISK}3 /mnt
 mkdir -p /mnt/boot/efi
 mount ${TARGET_DISK}1 /mnt/boot/efi
 
+# User sets up the user/root passwords.
+until userpass_selector; do : ; done
+until rootpass_selector; do : ; done
+until hostname_selector; do : ; done
+
 # Install base system, GRUB, and required packages
 pacstrap /mnt base base-devel linux linux-firmware grub efibootmgr
 
@@ -139,10 +144,6 @@ arch-chroot /mnt <<EOF
 	grub-mkconfig -o /boot/grub/grub.cfg
 
 EOF
-
-# User sets up the user/root passwords.
-until userpass_selector; do : ; done
-until rootpass_selector; do : ; done
 
 # Setting root password.
 info_print "Setting root password."
