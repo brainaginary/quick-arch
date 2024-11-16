@@ -26,20 +26,20 @@ error_print () {
 }
 
 userpass_selector () {
-    input_print "Please enter name for a user account (enter empty to not create one): "
+    input_print "Enter username: "
     read -r username
     if [[ -z "$username" ]]; then
         return 0
     fi
-    input_print "Please enter a password for $username (you're not going to see the password): "
+    input_print "Enter password for $username: "
     read -r -s userpass
     if [[ -z "$userpass" ]]; then
         echo
-        error_print "You need to enter a password for $username, please try again."
+        error_print "You need a password for $username, please try again."
         return 1
     fi
     echo
-    input_print "Please enter the password again (you're not going to see it): "
+    input_print "Enter the password again: "
     read -r -s userpass2
     echo
     if [[ "$userpass" != "$userpass2" ]]; then
@@ -51,15 +51,15 @@ userpass_selector () {
 }
 
 rootpass_selector () {
-    input_print "Please enter a password for the root user (you're not going to see it): "
+    input_print "Enter a password for the root user: "
     read -r -s rootpass
     if [[ -z "$rootpass" ]]; then
         echo
-        error_print "You need to enter a password for the root user, please try again."
+        error_print "You need a password for root, please try again."
         return 1
     fi
     echo
-    input_print "Please enter the password again (you're not going to see it): "
+    input_print "Enter the password again: "
     read -r -s rootpass2
     echo
     if [[ "$rootpass" != "$rootpass2" ]]; then
@@ -69,9 +69,15 @@ rootpass_selector () {
     return 0
 }
 
-# User sets up the user/root passwords.
-until userpass_selector; do : ; done
-until rootpass_selector; do : ; done
+hostname_selector () {
+    input_print "Please enter the hostname: "
+    read -r hostname
+    if [[ -z "$hostname" ]]; then
+        error_print "You need to enter a hostname in order to continue."
+        return 1
+    fi
+    return 0
+}
 
 # List available disks
 lsblk
@@ -126,7 +132,7 @@ arch-chroot /mnt <<EOF
 	echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
 	# Set hostname
-	echo "myarch" > /etc/hostname
+	echo "$hostname" > /etc/hostname
 
 	# Install GRUB (UEFI)
 	grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
@@ -134,6 +140,9 @@ arch-chroot /mnt <<EOF
 
 EOF
 
+# User sets up the user/root passwords.
+until userpass_selector; do : ; done
+until rootpass_selector; do : ; done
 
 # Setting root password.
 info_print "Setting root password."
