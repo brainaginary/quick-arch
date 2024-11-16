@@ -14,10 +14,9 @@ BGREEN='\e[92m'
 BYELLOW='\e[93m'
 RESET='\e[0m'
 
-# Default settings
-variable_defaults() {
-    kernel="linux-zen"
+define() {
     locale="en_US.UTF-8"
+    kernel="linux-zen"
     kblayout="us"
 }
 
@@ -62,33 +61,53 @@ virt_check () {
     esac
 }
 
-# Installing networkmanager
+# Installing the chosen networking method to the system (function).
 network_installer () {
     pacstrap /mnt networkmanager >/dev/null
     systemctl enable NetworkManager --root=/mnt &>/dev/null
 }
 
+# User enters a password for the LUKS Container (function).
+lukspass_selector () {
+    input_print "Please enter a password for the LUKS container (you're not going to see the password): "
+    read -r -s password
+    if [[ -z "$password" ]]; then
+        echo
+        error_print "You need to enter a password for the LUKS Container, please try again."
+        return 1
+    fi
+    echo
+    input_print "Please enter the password for the LUKS container again (you're not going to see the password): "
+    read -r -s password2
+    echo
+    if [[ "$password" != "$password2" ]]; then
+        error_print "Passwords don't match, please try again."
+        return 1
+    fi
+    return 0
+}
+
 # Setting up a password for the user account (function).
 userpass_selector () {
-    input_print "Enter user name: "
+    input_print "Please enter name for a user account (enter empty to not create one): "
     read -r username
     if [[ -z "$username" ]]; then
         return 0
     fi
-    input_print "Enter password for $username: "
+    input_print "Please enter a password for $username (you're not going to see the password): "
     read -r -s userpass
     if [[ -z "$userpass" ]]; then
         echo
-        error_print "You a password for $username, try again."
+        error_print "You need to enter a password for $username, please try again."
         return 1
     fi
     echo
-    input_print "Enter the password again: "
+    input_print "Please enter the password again (you're not going to see it): "
     read -r -s userpass2
     echo
     if [[ "$userpass" != "$userpass2" ]]; then
         echo
-        error_print "Passwords don't match, try again."
+        error_print "Passwords don't match, please try again."
         return 1
     fi
     return 0
@@ -96,19 +115,19 @@ userpass_selector () {
 
 # Setting up a password for the root account (function).
 rootpass_selector () {
-    input_print "Enter password for root user: "
+    input_print "Please enter a password for the root user (you're not going to see it): "
     read -r -s rootpass
     if [[ -z "$rootpass" ]]; then
         echo
-        error_print "You a password for root user, try again."
+        error_print "You need to enter a password for the root user, please try again."
         return 1
     fi
     echo
-    input_print "Enter the password again: "
+    input_print "Please enter the password again (you're not going to see it): "
     read -r -s rootpass2
     echo
     if [[ "$rootpass" != "$rootpass2" ]]; then
-        error_print "Passwords don't match, try again."
+        error_print "Passwords don't match, please try again."
         return 1
     fi
     return 0
@@ -118,8 +137,10 @@ rootpass_selector () {
 microcode_detector () {
     CPU=$(grep vendor_id /proc/cpuinfo)
     if [[ "$CPU" == *"AuthenticAMD"* ]]; then
+        info_print "An AMD CPU has been detected, the AMD microcode will be installed."
         microcode="amd-ucode"
     else
+        info_print "An Intel CPU has been detected, the Intel microcode will be installed."
         microcode="intel-ucode"
     fi
 }
@@ -137,16 +158,19 @@ hostname_selector () {
 
 # Welcome screen.
 echo -ne "${BOLD}${BYELLOW}
-====================================================================
-███████╗ █████╗ ███████╗████████╗    █████╗ ██████╗  ██████╗██╗  ██╗
-██╔════╝██╔══██╗██╔════╝╚══██╔══╝   ██╔══██╗██╔══██╗██╔════╝██║  ██║
-█████╗  ███████║███████╗   ██║█████╗███████║██████╔╝██║     ███████║
-██╔══╝  ██╔══██║╚════██║   ██║╚════╝██╔══██║██╔══██╗██║     ██╔══██║
-██║     ██║  ██║███████║   ██║      ██║  ██║██║  ██║╚██████╗██║  ██║
-╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝      ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-====================================================================
+======================================================================
+███████╗ █████╗ ███████╗██╗   ██╗      █████╗ ██████╗  ██████╗██╗  ██╗
+██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝     ██╔══██╗██╔══██╗██╔════╝██║  ██║
+█████╗  ███████║███████╗ ╚████╔╝█████╗███████║██████╔╝██║     ███████║
+██╔══╝  ██╔══██║╚════██║  ╚██╔╝ ╚════╝██╔══██║██╔══██╗██║     ██╔══██║
+███████╗██║  ██║███████║   ██║        ██║  ██║██║  ██║╚██████╗██║  ██║
+╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝        ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+======================================================================
 ${RESET}"
 info_print "Welcome to easy-arch, a script made in order to simplify the process of installing Arch Linux."
+
+# Setting up keyboard layout.
+until keyboard_selector; do : ; done
 
 # Choosing the target for the installation.
 info_print "Available disks for the installation:"
@@ -157,6 +181,9 @@ do
     info_print "Arch Linux will be installed on the following disk: $DISK"
     break
 done
+
+# Setting up LUKS password.
+until lukspass_selector; do : ; done
 
 # User choses the hostname.
 until hostname_selector; do : ; done
@@ -182,8 +209,10 @@ parted -s "$DISK" \
     mklabel gpt \
     mkpart ESP fat32 1MiB 1025MiB \
     set 1 esp on \
+    mkpart CRYPTROOT 1025MiB 100% \
 
     ESP="/dev/disk/by-partlabel/ESP"
+CRYPTROOT="/dev/disk/by-partlabel/CRYPTROOT"
 
 # Informing the Kernel of the changes.
 info_print "Informing the Kernel about the disk changes."
@@ -193,12 +222,36 @@ partprobe "$DISK"
 info_print "Formatting the EFI Partition as FAT32."
 mkfs.fat -F 32 "$ESP" &>/dev/null
 
+# Creating a LUKS Container for the root partition.
+info_print "Creating LUKS Container for the root partition."
+echo -n "$password" | cryptsetup luksFormat "$CRYPTROOT" -d - &>/dev/null
+echo -n "$password" | cryptsetup open "$CRYPTROOT" cryptroot -d -
+BTRFS="/dev/mapper/cryptroot"
+
+# Formatting the LUKS Container as BTRFS.
+info_print "Formatting the LUKS container as BTRFS."
+mkfs.btrfs "$BTRFS" &>/dev/null
+mount "$BTRFS" /mnt
+
+# Creating BTRFS subvolumes.
+info_print "Creating BTRFS subvolumes."
+subvols=(snapshots var_pkgs var_log home root srv)
+for subvol in '' "${subvols[@]}"; do
+    btrfs su cr /mnt/@"$subvol" &>/dev/null
+done
+
 # Mounting the newly created subvolumes.
-mount /mnt
 umount /mnt
 info_print "Mounting the newly created subvolumes."
+mountopts="ssd,noatime,compress-force=zstd:3,discard=async"
+mount -o "$mountopts",subvol=@ "$BTRFS" /mnt
 mkdir -p /mnt/{home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
+for subvol in "${subvols[@]:2}"; do
+    mount -o "$mountopts",subvol=@"$subvol" "$BTRFS" /mnt/"${subvol//_//}"
+done
 chmod 750 /mnt/root
+mount -o "$mountopts",subvol=@snapshots "$BTRFS" /mnt/.snapshots
+mount -o "$mountopts",subvol=@var_pkgs "$BTRFS" /mnt/var/cache/pacman/pkg
 chattr +C /mnt/var/log
 mount "$ESP" /mnt/boot/
 
@@ -207,7 +260,7 @@ microcode_detector
 
 # Pacstrap (setting up a base sytem onto the new root).
 info_print "Installing the base system (it may take a while)."
-pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers grub rsync efibootmgr reflector sudo &>/dev/null
+pacstrap -K /mnt base "$kernel" "$microcode" linux-firmware "$kernel"-headers btrfs-progs grub grub-btrfs rsync efibootmgr snapper reflector snap-pac zram-generator sudo &>/dev/null
 
 # Setting up the hostname.
 echo "$hostname" > /mnt/etc/hostname
@@ -241,8 +294,13 @@ cat > /mnt/etc/mkinitcpio.conf <<EOF
 HOOKS=(systemd autodetect keyboard sd-vconsole modconf block sd-encrypt filesystems)
 EOF
 
+# Setting up LUKS2 encryption in grub.
+info_print "Setting up grub config."
+UUID=$(blkid -s UUID -o value $CRYPTROOT)
+sed -i "\,^GRUB_CMDLINE_LINUX=\"\",s,\",&rd.luks.name=$UUID=cryptroot root=$BTRFS," /mnt/etc/default/grub
+
 # Configuring the system.
-info_print "Configuring the system."
+info_print "Configuring the system (timezone, system clock, initramfs, Snapper, GRUB)."
 arch-chroot /mnt /bin/bash -e <<EOF
 
     # Setting up timezone.
@@ -256,6 +314,15 @@ arch-chroot /mnt /bin/bash -e <<EOF
 
     # Generating a new initramfs.
     mkinitcpio -P &>/dev/null
+
+    # Snapper configuration.
+    umount /.snapshots
+    rm -r /.snapshots
+    snapper --no-dbus -c root create-config /
+    btrfs subvolume delete /.snapshots &>/dev/null
+    mkdir /.snapshots
+    mount -a &>/dev/null
+    chmod 750 /.snapshots
 
     # Installing GRUB.
     grub-install --target=x86_64-efi --efi-directory=/boot/ --bootloader-id=GRUB &>/dev/null
@@ -278,13 +345,38 @@ if [[ -n "$username" ]]; then
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
 fi
 
+# Boot backup hook.
+info_print "Configuring /boot backup when pacman transactions are made."
+mkdir /mnt/etc/pacman.d/hooks
+cat > /mnt/etc/pacman.d/hooks/50-bootbackup.hook <<EOF
+[Trigger]
+Operation = Upgrade
+Operation = Install
+Operation = Remove
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+
+[Action]
+Depends = rsync
+Description = Backing up /boot...
+When = PostTransaction
+Exec = /usr/bin/rsync -a --delete /boot /.bootbackup
+EOF
+
+# ZRAM configuration.
+info_print "Configuring ZRAM."
+cat > /mnt/etc/systemd/zram-generator.conf <<EOF
+[zram0]
+zram-size = min(ram, 8192)
+EOF
+
 # Pacman eye-candy features.
 info_print "Enabling colours, animations, and parallel downloads for pacman."
 sed -Ei 's/^#(Color)$/\1\nILoveCandy/;s/^#(ParallelDownloads).*/\1 = 10/' /mnt/etc/pacman.conf
 
 # Enabling various services.
-info_print "Enabling services"
-services=(systemd-oomd)
+info_print "Enabling Reflector, automatic snapshots, BTRFS scrubbing and systemd-oomd."
+services=(reflector.timer snapper-timeline.timer snapper-cleanup.timer btrfs-scrub@-.timer btrfs-scrub@home.timer btrfs-scrub@var-log.timer btrfs-scrub@\\x2esnapshots.timer grub-btrfsd.service systemd-oomd)
 for service in "${services[@]}"; do
     systemctl enable "$service" --root=/mnt &>/dev/null
 done
@@ -292,3 +384,4 @@ done
 # Finishing up.
 info_print "Done, you may now wish to reboot (further changes can be done by chrooting into /mnt)."
 exit
+
