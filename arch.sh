@@ -68,26 +68,6 @@ network_installer () {
     systemctl enable NetworkManager --root=/mnt &>/dev/null
 }
 
-# User enters a password for the LUKS Container (function).
-lukspass_selector () {
-    input_print "Please enter a password for the LUKS container (you're not going to see the password): "
-    read -r -s password
-    if [[ -z "$password" ]]; then
-        echo
-        error_print "You need to enter a password for the LUKS Container, please try again."
-        return 1
-    fi
-    echo
-    input_print "Please enter the password for the LUKS container again (you're not going to see the password): "
-    read -r -s password2
-    echo
-    if [[ "$password" != "$password2" ]]; then
-        error_print "Passwords don't match, please try again."
-        return 1
-    fi
-    return 0
-}
-
 # Setting up a password for the user account (function).
 userpass_selector () {
     input_print "Enter user name: "
@@ -178,9 +158,6 @@ do
     break
 done
 
-# Setting up LUKS password.
-until lukspass_selector; do : ; done
-
 # User choses the hostname.
 until hostname_selector; do : ; done
 
@@ -217,6 +194,7 @@ info_print "Formatting the EFI Partition as FAT32."
 mkfs.fat -F 32 "$ESP" &>/dev/null
 
 # Mounting the newly created subvolumes.
+mount /mnt
 umount /mnt
 info_print "Mounting the newly created subvolumes."
 mkdir -p /mnt/{home,root,srv,.snapshots,var/{log,cache/pacman/pkg},boot}
