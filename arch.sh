@@ -1,5 +1,78 @@
 #!/bin/bash
 
+clear
+
+# Cosmetics (colours for text).
+BOLD='\e[1m'
+BRED='\e[91m'
+BBLUE='\e[34m'
+BGREEN='\e[92m'
+BYELLOW='\e[93m'
+RESET='\e[0m'
+
+# Pretty print (function).
+info_print () {
+    echo -e "${BOLD}${BGREEN}[ ${BYELLOW}•${BGREEN} ] $1${RESET}"
+}
+
+# Pretty print for input (function).
+input_print () {
+    echo -ne "${BOLD}${BYELLOW}[ ${BGREEN}•${BYELLOW} ] $1${RESET}"
+}
+
+# Alert user of bad input (function).
+error_print () {
+    echo -e "${BOLD}${BRED}[ ${BBLUE}•${BRED} ] $1${RESET}"
+}
+
+userpass_selector () {
+    input_print "Please enter name for a user account (enter empty to not create one): "
+    read -r username
+    if [[ -z "$username" ]]; then
+        return 0
+    fi
+    input_print "Please enter a password for $username (you're not going to see the password): "
+    read -r -s userpass
+    if [[ -z "$userpass" ]]; then
+        echo
+        error_print "You need to enter a password for $username, please try again."
+        return 1
+    fi
+    echo
+    input_print "Please enter the password again (you're not going to see it): "
+    read -r -s userpass2
+    echo
+    if [[ "$userpass" != "$userpass2" ]]; then
+        echo
+        error_print "Passwords don't match, please try again."
+        return 1
+    fi
+    return 0
+}
+
+rootpass_selector () {
+    input_print "Please enter a password for the root user (you're not going to see it): "
+    read -r -s rootpass
+    if [[ -z "$rootpass" ]]; then
+        echo
+        error_print "You need to enter a password for the root user, please try again."
+        return 1
+    fi
+    echo
+    input_print "Please enter the password again (you're not going to see it): "
+    read -r -s rootpass2
+    echo
+    if [[ "$rootpass" != "$rootpass2" ]]; then
+        error_print "Passwords don't match, please try again."
+        return 1
+    fi
+    return 0
+}
+
+# User sets up the user/root passwords.
+until userpass_selector; do : ; done
+until rootpass_selector; do : ; done
+
 # List available disks
 lsblk
 
@@ -43,40 +116,37 @@ genfstab -U /mnt >> /mnt/etc/fstab
 # Chroot into the new system
 arch-chroot /mnt <<EOF
 
-# Set the timezone
-ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
-hwclock --systohc
+	# Set the timezone
+	ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
+	hwclock --systohc
 
-# Set locale
-sed -i '/en_US.UTF-8/s/^#//g' /etc/locale.gen
-locale-gen
-echo "LANG=en_US.UTF-8" > /etc/locale.conf
+	# Set locale
+	sed -i '/en_US.UTF-8/s/^#//g' /etc/locale.gen
+	locale-gen
+	echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-# Set hostname
-echo "myarch" > /etc/hostname
+	# Set hostname
+	echo "myarch" > /etc/hostname
 
-# Network settings
-echo "127.0.0.1   localhost" > /etc/hosts
-echo "::1         localhost" >> /etc/hosts
-echo "127.0.1.1   myarch.localdomain myarch" >> /etc/hosts
-
-# Install GRUB (UEFI)
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
-grub-mkconfig -o /boot/grub/grub.cfg
-
-# Create user
-read -p "Enter username for new user: " USERNAME
-useradd -m -G wheel $USERNAME
-passwd $USERNAME
-
-# Set root password
-echo "Set the root password"
-passwd
-
-# Enable sudo for the user (require "wheel" group)
-echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
+	# Install GRUB (UEFI)
+	grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
+	grub-mkconfig -o /boot/grub/grub.cfg
 
 EOF
+
+
+# Setting root password.
+info_print "Setting root password."
+echo "root:$rootpass" | arch-chroot /mnt chpasswd
+
+# Setting user password.
+if [[ -n "$username" ]]; then
+    echo "%wheel ALL=(ALL:ALL) ALL" > /mnt/etc/sudoers.d/wheel
+    info_print "Adding the user $username to the system with root privilege."
+    arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
+    info_print "Setting user password for $username."
+    echo "$username:$userpass" | arch-chroot /mnt chpasswd
+fi
 
 # Unmount and reboot
 umount -R /mnt
