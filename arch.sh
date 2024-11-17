@@ -118,10 +118,12 @@ mount ${TARGET_DISK}3 /mnt
 mkdir -p /mnt/boot/efi
 mount ${TARGET_DISK}1 /mnt/boot/efi
 
-# Install base system, GRUB, and required packages
+info_print "Installing base packages"
 pacstrap /mnt base base-devel linux-zen linux-firmware grub efibootmgr sudo >& /dev/null
-# Install network utility
+info_print "Installing utilities"
 pacstrap /mnt networkmanager sddm >& /dev/null
+info_print "Installing hyprland"
+pacstrap /mnt hyprland waybar kitty hyprutils hyprpaper hyprlang hyprcursor >& /dev/null
 
 # Generate fstab file
 genfstab -U /mnt >> /mnt/etc/fstab
