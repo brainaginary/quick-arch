@@ -119,7 +119,9 @@ mkdir -p /mnt/boot/efi
 mount ${TARGET_DISK}1 /mnt/boot/efi
 
 # Install base system, GRUB, and required packages
-pacstrap /mnt base base-devel linux-zen linux-firmware grub efibootmgr sudo
+pacstrap /mnt base base-devel linux-zen linux-firmware grub efibootmgr sudo >& /dev/null
+# Install network utility
+pacstrap /mnt networkmanager sddm >& /dev/null
 
 # Generate fstab file
 genfstab -U /mnt >> /mnt/etc/fstab
@@ -136,7 +138,7 @@ arch-chroot /mnt <<EOF
 	echo "$hostname" > /etc/hostname
 
 	# Install GRUB (UEFI)
-	grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
+	grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
 	grub-mkconfig -o /boot/grub/grub.cfg
 
 EOF
@@ -147,12 +149,26 @@ echo "root:$rootpass" | arch-chroot /mnt chpasswd
 
 # Setting user password.
 if [[ -n "$username" ]]; then
-    echo "%wheel ALL=(ALL:ALL) ALL" > /mnt/etc/sudoers.d/wheel
-    info_print "Adding the user $username to the system with root privilege."
+    info_print "Adding the user $username to wheel."
     arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$username"
     info_print "Setting user password for $username."
     echo "$username:$userpass" | arch-chroot /mnt chpasswd
+    # Uncomment the %wheel line in the sudoers file
+    arch-chroot /mnt sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 fi
+
+# List of services to enable and start
+services=(
+    NetworkManager.service  # Manages network connections
+    sddm.service            # Graphical login manager
+)
+
+# Enable and start each service
+for service in "${services[@]}"; do
+    echo "Enabling and starting $service..."
+    arch-chroot /mnt systemctl enable "$service"
+    arch-chroot /mnt systemctl start "$service"
+done
 
 #Unmount and reboot
 umount -R /mnt
